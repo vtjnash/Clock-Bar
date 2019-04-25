@@ -23,9 +23,9 @@ TouchButton *button;
 NSString *STATUS_ICON_BLACK = @"clock-64";
 
 NSDateFormatter *timeformatter;
-NSString *format = @"hh:mm";
+NSString *format = @"h:mm";
 NSMutableAttributedString *colorTitle;
-
+NSColor *color;
 
 - (void) awakeFromNib {
     
@@ -84,16 +84,16 @@ NSMutableAttributedString *colorTitle;
 
 -(void)changeColor:(id)sender
 {
-    
-    [colorTitle addAttribute:NSForegroundColorAttributeName value:sender range:NSMakeRange(0, button.title.length)];
+    color = sender;
+    [colorTitle addAttribute:NSForegroundColorAttributeName value:color range:NSMakeRange(0, colorTitle.length)];
     [button setAttributedTitle:colorTitle];
 }
 
--(void)UpdateTime:(id)sender
+-(void)UpdateTime:(NSTimer *)timer
 {
     NSString *time  = [timeformatter stringFromDate:[NSDate date]];
     [colorTitle.mutableString setString:time];
-    [button setAttributedTitle:colorTitle];
+    [self changeColor:color];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
@@ -105,42 +105,41 @@ NSMutableAttributedString *colorTitle;
     [timeformatter setTimeStyle: NSDateFormatterShortStyle];
     [timeformatter setDateFormat:format];
     
-    NSDate *now = [NSDate date];
-    NSString *newDateString = [timeformatter stringFromDate:now];
-    
-    
-    button = [TouchButton buttonWithTitle:newDateString target:nil action:nil];
+    button = [TouchButton buttonWithTitle:@"time" target:nil action:nil];
     [button setDelegate: self];
-    
+    [button setAlignment:NSTextAlignmentCenter];
+
     NSFont *systemFont = [NSFont systemFontOfSize:14.0f];
     NSDictionary * fontAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:systemFont, NSFontAttributeName, nil];
 
     colorTitle = [[NSMutableAttributedString alloc] initWithString:[button title] attributes:fontAttributes];
     
     NSString *colorString = [[NSUserDefaults standardUserDefaults] objectForKey:@"clock_color"];
-    NSColor *color = nil;
-    if (colorString == nil){
+    if (colorString == nil) {
         color = [NSColor whiteColor];
-    } else{
+    }
+    else {
         color = [self getColorForString:colorString];
     }
-    
-    [colorTitle addAttribute:NSForegroundColorAttributeName value:color range:NSMakeRange(0, button.title.length)];
-    [button setAttributedTitle:colorTitle];
-    
-    
+
     NSCustomTouchBarItem *time = [[NSCustomTouchBarItem alloc] initWithIdentifier:muteIdentifier];
     time.view = button;
-    [NSTouchBarItem addSystemTrayItem:time];
-    [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(UpdateTime:) userInfo:nil repeats:YES];
-
     touchBarButton = button;
 
     [NSTouchBarItem addSystemTrayItem:time];
     DFRElementSetControlStripPresenceForIdentifier(muteIdentifier, YES);
 
+    double now_minute = floor([[NSDate date] timeIntervalSince1970] / 60);
+    NSDate *update = [NSDate dateWithTimeIntervalSince1970:(now_minute * 60 + 59)];
+    NSTimer *timer = [[NSTimer alloc] initWithFireDate:update interval:60.0 target:self selector:@selector(UpdateTime:) userInfo:nil repeats:YES];
+    timer.tolerance = 2;
+
+    NSRunLoop *runner = [NSRunLoop currentRunLoop];
+    [runner addTimer:timer forMode: NSDefaultRunLoopMode];
+
+    [self UpdateTime:nil];
+
     [self enableLoginAutostart];
-    
 }
 
 -(NSColor*)getColorForString:(id)sender{
@@ -149,7 +148,6 @@ NSMutableAttributedString *colorTitle;
 
 
 - (NSImage*) getStatusBarImage {
-
     return [NSImage imageNamed:STATUS_ICON_BLACK];
 }
 
@@ -188,12 +186,13 @@ NSMutableAttributedString *colorTitle;
 - (void)onPressed:(TouchButton*)sender
 {
     NSLog(@"On Press clicked");
-    if ([format isEqual:@"hh:mm"]){
-        format = @"HH:mm";
+    if ([format isEqual:@"h:mm"]){
+        format = @"H:mm";
     } else {
-        format = @"hh:mm";
+        format = @"h:mm";
     }
     [timeformatter setDateFormat:format];
+    [self UpdateTime:nil];
 }
 
 - (void)onLongPressed:(TouchButton*)sender
